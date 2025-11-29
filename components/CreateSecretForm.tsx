@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { generateKey, encrypt, exportKey } from "@/lib/crypto";
+import { generateKey, encrypt, encryptKeyWithPin } from "@/lib/crypto";
 
 type Toast = {
   id: number;
@@ -11,6 +11,7 @@ type Toast = {
 
 export default function CreateSecretForm() {
   const [secret, setSecret] = useState("");
+  const [pin, setPin] = useState("");
   const [ttl, setTtl] = useState(86400); // Default: 1 day
   const [loading, setLoading] = useState(false);
   const [shareableUrl, setShareableUrl] = useState("");
@@ -36,6 +37,10 @@ export default function CreateSecretForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!secret.trim()) return;
+    if (!pin.trim() || pin.length < 4) {
+      showToast("PIN must be at least 4 characters", "error");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -45,8 +50,8 @@ export default function CreateSecretForm() {
       // Encrypt the secret
       const { encryptedHex, ivHex } = await encrypt(secret, key);
 
-      // Export key to base64 for URL storage
-      const keyBase64 = await exportKey(key);
+      // Encrypt the key with PIN
+      const { encryptedKeyHex, keyIvHex, saltHex } = await encryptKeyWithPin(key, pin);
 
       // POST to API
       const response = await fetch("/api/secret", {
@@ -67,9 +72,14 @@ export default function CreateSecretForm() {
 
       const { id } = await response.json();
 
-      // Construct shareable URL
+      // Construct shareable URL with encrypted key data
       const baseUrl = window.location.origin;
-      const url = `${baseUrl}/view/${id}#key=${encodeURIComponent(keyBase64)}`;
+      const keyData = JSON.stringify({
+        encryptedKeyHex,
+        keyIvHex,
+        saltHex,
+      });
+      const url = `${baseUrl}/view/${id}#key=${encodeURIComponent(btoa(keyData))}`;
       setShareableUrl(url);
     } catch (error) {
       console.error("Error creating secret:", error);
@@ -81,6 +91,7 @@ export default function CreateSecretForm() {
 
   const handleReset = () => {
     setSecret("");
+    setPin("");
     setShareableUrl("");
     setTtl(86400);
   };
@@ -167,6 +178,28 @@ export default function CreateSecretForm() {
 
         <div className="space-y-3">
           <label
+            htmlFor="pin"
+            className="block text-sm font-bold text-black uppercase tracking-wide"
+          >
+            PIN (minimum 4 characters)
+          </label>
+          <input
+            id="pin"
+            type="password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="Enter a PIN to protect your secret"
+            className="w-full px-4 py-3 bg-gray-50 border-2 border-black text-black placeholder-gray-400 focus:outline-none focus:border-blue-500 font-mono text-lg text-center tracking-widest"
+            required
+            minLength={4}
+          />
+          <p className="text-xs text-gray-600 font-medium">
+            Recipients will need this PIN to decrypt the secret
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <label
             htmlFor="ttl"
             className="block text-sm font-bold text-black uppercase tracking-wide"
           >
@@ -186,7 +219,7 @@ export default function CreateSecretForm() {
 
         <button
           type="submit"
-          disabled={loading || !secret.trim()}
+          disabled={loading || !secret.trim() || !pin.trim() || pin.length < 4}
           className="w-full px-6 py-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white border-2 border-black font-black uppercase tracking-wide transition-all shadow-[6px_6px_0_0_rgb(0,0,0)] hover:shadow-[3px_3px_0_0_rgb(0,0,0)] hover:translate-x-[3px] hover:translate-y-[3px] disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
         >
           {loading ? "Encrypting..." : "Encrypt & Share"}
