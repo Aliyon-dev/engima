@@ -135,7 +135,7 @@ export default function Home() {
                       Auto-Destroy
                     </h3>
                     <p className="text-gray-700 font-medium">
-                      When the recipient views the secret, it's decrypted in their browser 
+                      When the recipient views the secret, it&apos;s decrypted in their browser 
                       and immediately deleted from the server. One-time use only.
                     </p>
                   </div>
