@@ -44,7 +44,7 @@ function hexToArrayBuffer(hex: string): ArrayBuffer {
 export async function exportKey(key: CryptoKey): Promise<string> {
   const exported = await crypto.subtle.exportKey("raw", key);
   const bytes = new Uint8Array(exported);
-  const base64 = btoa(String.fromCharCode(...bytes));
+  const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
   return base64;
 }
 
